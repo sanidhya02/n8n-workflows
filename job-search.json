@@ -1,0 +1,299 @@
+{
+  "name": "Job Alert Aggregator — LinkedIn + Naukri + Indeed → Gemini → WhatsApp/Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "c0000001-0000-0000-0000-000000000001",
+      "name": "Daily Trigger (8 AM)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 400],
+      "notes": "Runs every day at 8:00 AM. Adjust timezone in n8n workflow settings to IST."
+    },
+    {
+      "parameters": {
+        "operation": "runSse",
+        "url": "https://www.linkedin.com/jobs/search/?keywords=ServiceNow%20developer&location=India&f_TPR=r86400&sortBy=DD",
+        "goal": "Extract job postings from this LinkedIn Jobs search page. These are ServiceNow Developer and SRE roles in India posted in the last 24 hours.\n\nFor EACH job listing visible on the page, extract:\n- jobTitle: The exact job title\n- company: Company name\n- location: City/Location (e.g., 'Hyderabad, India' or 'Remote')\n- postedDate: When it was posted (e.g., '2 hours ago', '1 day ago')\n- jobUrl: The full LinkedIn URL to the job posting\n- jobType: Full-time / Contract / Part-time (if visible)\n- experienceLevel: Entry / Mid / Senior (if visible)\n- salaryRange: Salary if shown, otherwise 'Not disclosed'\n- shortDescription: First 2-3 sentences of the job description if visible\n- skills: Key skills mentioned (comma-separated)\n\nAlso search for 'Site Reliability Engineer India' on the same page and extract those results too.\n\nReturn as JSON: { source: 'LinkedIn', jobs: [{ jobTitle: string, company: string, location: string, postedDate: string, jobUrl: string, jobType: string, experienceLevel: string, salaryRange: string, shortDescription: string, skills: string }] }\n\nExtract up to 20 jobs. Only include jobs posted within the last 24 hours.",
+        "options": {
+          "browserProfile": "stealth"
+        }
+      },
+      "id": "c0000001-0000-0000-0000-000000000002",
+      "name": "TinyFish: LinkedIn Jobs",
+      "type": "n8n-nodes-tinyfish.tinyfish",
+      "typeVersion": 1,
+      "position": [300, 200],
+      "credentials": {
+        "tinyfishApi": {
+          "id": "",
+          "name": "TinyFish Web Agent API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "runSse",
+        "url": "https://www.naukri.com/servicenow-developer-jobs?jobAge=1",
+        "goal": "Extract job postings from Naukri.com for ServiceNow Developer and SRE roles posted in the last 24 hours.\n\nFirst, scrape results from the current page (ServiceNow Developer jobs).\nThen use the search bar to also search for 'Site Reliability Engineer' and scrape those results too.\n\nFor EACH job listing, extract:\n- jobTitle: The exact job title\n- company: Company name\n- location: City/Location\n- postedDate: When posted (e.g., 'Today', '1 day ago', 'Few hours ago')\n- jobUrl: Full Naukri URL to the job posting\n- jobType: Full-time / Contract (if shown)\n- experienceLevel: Experience required (e.g., '3-5 years')\n- salaryRange: Salary range if shown, otherwise 'Not disclosed'\n- shortDescription: First 2-3 sentences of the job description or key responsibilities\n- skills: Key skills listed (comma-separated)\n\nReturn as JSON: { source: 'Naukri', jobs: [{ jobTitle: string, company: string, location: string, postedDate: string, jobUrl: string, jobType: string, experienceLevel: string, salaryRange: string, shortDescription: string, skills: string }] }\n\nExtract up to 20 jobs. Only include jobs posted within the last 24 hours.",
+        "options": {
+          "browserProfile": "stealth"
+        }
+      },
+      "id": "c0000001-0000-0000-0000-000000000003",
+      "name": "TinyFish: Naukri Jobs",
+      "type": "n8n-nodes-tinyfish.tinyfish",
+      "typeVersion": 1,
+      "position": [300, 500],
+      "credentials": {
+        "tinyfishApi": {
+          "id": "",
+          "name": "TinyFish Web Agent API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "runSse",
+        "url": "https://in.indeed.com/jobs?q=ServiceNow+developer&fromage=1&sort=date",
+        "goal": "Extract job postings from Indeed India for ServiceNow Developer and SRE roles posted in the last 24 hours.\n\nFirst, scrape results from the current page (ServiceNow Developer jobs).\nThen use the search bar to also search for 'Site Reliability Engineer' and scrape those results too.\n\nFor EACH job listing, extract:\n- jobTitle: The exact job title\n- company: Company name\n- location: City/Location\n- postedDate: When posted (e.g., 'Just posted', 'Today', '1 day ago')\n- jobUrl: Full Indeed URL to the job posting\n- jobType: Full-time / Contract (if shown)\n- experienceLevel: Experience level if mentioned\n- salaryRange: Salary if shown, otherwise 'Not disclosed'\n- shortDescription: First 2-3 sentences of the job description or snippet shown\n- skills: Key skills mentioned (comma-separated)\n\nReturn as JSON: { source: 'Indeed', jobs: [{ jobTitle: string, company: string, location: string, postedDate: string, jobUrl: string, jobType: string, experienceLevel: string, salaryRange: string, shortDescription: string, skills: string }] }\n\nExtract up to 20 jobs. Only include jobs posted in the last 24 hours.",
+        "options": {
+          "browserProfile": "stealth"
+        }
+      },
+      "id": "c0000001-0000-0000-0000-000000000004",
+      "name": "TinyFish: Indeed Jobs",
+      "type": "n8n-nodes-tinyfish.tinyfish",
+      "typeVersion": 1,
+      "position": [300, 800],
+      "credentials": {
+        "tinyfishApi": {
+          "id": "",
+          "name": "TinyFish Web Agent API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "Gemini 2.5 Flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a job market analyst and career advisor specializing in IT roles. I scraped three job boards for ServiceNow Developer and SRE positions in India posted in the last 24 hours.\n\n**LinkedIn Results:**\n{{ JSON.stringify($('TinyFish: LinkedIn Jobs').first().json, null, 2) }}\n\n**Naukri Results:**\n{{ JSON.stringify($('TinyFish: Naukri Jobs').first().json, null, 2) }}\n\n**Indeed Results:**\n{{ JSON.stringify($('TinyFish: Indeed Jobs').first().json, null, 2) }}\n\nNow do the following:\n\n## STEP 1: Deduplicate\nRemove duplicate job postings that appear on multiple platforms. Match by company name + similar job title + same location. When duplicates exist, keep the one with the most complete information and note which platforms it appeared on.\n\n## STEP 2: Score Each Job (1-100)\nScore each UNIQUE job on these weighted criteria:\n- **Role Relevance (30 pts)**: How closely does the title/description match 'ServiceNow Developer', 'ServiceNow Architect', 'ServiceNow Admin', or 'Site Reliability Engineer'? Penalize generic IT roles that just mention ServiceNow as one of many skills.\n- **Company Quality (20 pts)**: Is it a well-known product company, Big 4 consultancy, Fortune 500, or top-tier startup? Penalize unknown staffing agencies.\n- **Compensation Signal (15 pts)**: Is salary disclosed? Is it competitive? Higher score for transparency and good ranges.\n- **Location Fit (15 pts)**: Hyderabad or Remote scores highest. Bangalore, Pune, Mumbai score well. Other cities score lower.\n- **Growth Potential (10 pts)**: Does it mention learning, certifications, career growth, or cutting-edge work (AI/ML integration, DevOps, platform engineering)?\n- **Recency (10 pts)**: Posted in last few hours scores higher than 1 day ago.\n\n## STEP 3: Return Top 10\nReturn ONLY the top 10 jobs sorted by score (highest first).\n\nFor each job, format EXACTLY like this (this will be sent to WhatsApp, use WhatsApp formatting):\n\n*#{rank} — {jobTitle}* (Score: {score}/100)\n🏢 {company}\n📍 {location} | 💼 {jobType}\n💰 {salaryRange}\n🎯 {experienceLevel}\n🔧 {top 3-4 skills}\n📋 {one-line why this job scored high}\n🔗 {jobUrl}\n📌 Found on: {platforms where it appeared}\n\nAfter listing all 10, add:\n\n---\n📊 *Today's Market Snapshot*\n• Total jobs found: {count across all platforms}\n• Duplicates removed: {count}\n• Top hiring companies today: {top 3 companies by number of openings}\n• Most demanded skills: {top 5 skills across all postings}\n• Salary range observed: {min} - {max} (where disclosed)\n• 🟢 Hot locations: {cities with most openings}\n\n💡 _Pro tip: {one actionable career tip based on today's data, e.g., 'ITSM skills are in high demand today — consider CSA certification if you haven't already'}_",
+              "role": "user"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": false,
+        "options": {
+          "systemMessage": "You are a senior IT career advisor who helps professionals find the best ServiceNow and SRE opportunities in India. You are data-driven, blunt about job quality, and never recommend roles from shady staffing agencies or clickbait postings. You score jobs fairly and explain your reasoning. Your output will be sent directly to a WhatsApp group — use WhatsApp-compatible formatting (*bold*, _italic_). Keep it scannable on mobile. Do NOT use markdown headers (##). Use emojis and bold text for structure instead.",
+          "maxOutputTokens": 3500,
+          "temperature": 0.3
+        }
+      },
+      "id": "c0000001-0000-0000-0000-000000000005",
+      "name": "Gemini: Dedupe + Score + Rank",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [700, 500],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "",
+          "name": "Google Gemini (PaLM) API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c0000001-0000-0000-0000-000000000006",
+      "name": "Has Results?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [1000, 500]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "YOUR_WHATSAPP_GROUP_CHAT_ID",
+        "message": "=🎯 *Daily Job Alert — ServiceNow & SRE* 🎯\n📅 _{{ $now.format('dd MMM yyyy') }}_\n\n{{ $json.text }}",
+        "options": {}
+      },
+      "id": "c0000001-0000-0000-0000-000000000007",
+      "name": "WhatsApp: Send Top Jobs",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1300, 400],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "",
+          "name": "WhatsApp Business API"
+        }
+      },
+      "notes": "Replace YOUR_WHATSAPP_GROUP_CHAT_ID with your actual WhatsApp group chat ID."
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🎯 *Daily Job Alert — ServiceNow & SRE* 🎯\n📅 _{{ $now.format('dd MMM yyyy') }}_\n\n{{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "c0000001-0000-0000-0000-000000000008",
+      "name": "Telegram: Send Top Jobs",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1300, 600],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram Bot API"
+        }
+      },
+      "notes": "Replace YOUR_TELEGRAM_CHAT_ID with your Telegram group/channel chat ID. Create a bot via @BotFather first."
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "YOUR_WHATSAPP_GROUP_CHAT_ID",
+        "message": "📭 *No new ServiceNow/SRE jobs found today.*\n_All three platforms returned zero results for the last 24 hours. This is unusual — will retry tomorrow._\n\n💡 _Tip: Quiet days are great for updating your resume or practicing interview questions!_",
+        "options": {}
+      },
+      "id": "c0000001-0000-0000-0000-000000000009",
+      "name": "WhatsApp: No Jobs Today",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [1300, 800],
+      "credentials": {
+        "whatsAppApi": {
+          "id": "",
+          "name": "WhatsApp Business API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "searchConfig",
+              "value": "={\"roles\": [\"ServiceNow Developer\", \"ServiceNow Architect\", \"ServiceNow Admin\", \"Site Reliability Engineer\", \"SRE\"], \"locations\": [\"India\", \"Hyderabad\", \"Bangalore\", \"Remote\"], \"maxAge\": \"24h\", \"preferredLocation\": \"Hyderabad\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c0000001-0000-0000-0000-000000000010",
+      "name": "Search Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [150, 400],
+      "notes": "Edit this node to customize: roles to search, preferred locations, max job age. This makes it easy to tweak without editing scraper prompts."
+    }
+  ],
+  "connections": {
+    "Daily Trigger (8 AM)": {
+      "main": [
+        [
+          { "node": "Search Config", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Search Config": {
+      "main": [
+        [
+          { "node": "TinyFish: LinkedIn Jobs", "type": "main", "index": 0 },
+          { "node": "TinyFish: Naukri Jobs", "type": "main", "index": 0 },
+          { "node": "TinyFish: Indeed Jobs", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "TinyFish: LinkedIn Jobs": {
+      "main": [
+        [
+          { "node": "Gemini: Dedupe + Score + Rank", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "TinyFish: Naukri Jobs": {
+      "main": [
+        [
+          { "node": "Gemini: Dedupe + Score + Rank", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "TinyFish: Indeed Jobs": {
+      "main": [
+        [
+          { "node": "Gemini: Dedupe + Score + Rank", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Gemini: Dedupe + Score + Rank": {
+      "main": [
+        [
+          { "node": "Has Results?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Has Results?": {
+      "main": [
+        [
+          { "node": "WhatsApp: Send Top Jobs", "type": "main", "index": 0 },
+          { "node": "Telegram: Send Top Jobs", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "WhatsApp: No Jobs Today", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "jobs" },
+    { "name": "automation" },
+    { "name": "career" },
+    { "name": "daily-alert" }
+  ],
+  "triggerCount": 1
+}
